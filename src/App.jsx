@@ -15,16 +15,27 @@ function App() {
     try {
       const response = await fetch(API_URL);
       if (!response.ok) throw new Error('Unreachable');
+      
       const json = await response.json();
 
-      if (Array.isArray(json) && json.length > 0) {
-        const cleanData = json.filter(item => isNaN(item.sensor) && !['matlab_datenum', 'unix_time', 'timestamp'].includes(item.sensor.toLowerCase()));
+      // Check the system_status inside the JSON body
+      const isS3Backup = json.system_status === "S3 (Failover Archive)";
+      
+      if (json.data && Array.isArray(json.data)) {
+        const cleanData = json.data.filter(item => 
+          isNaN(item.sensor) && 
+          !['matlab_datenum', 'unix_time', 'timestamp'].includes(item.sensor.toLowerCase())
+        );
         cleanData.sort((a, b) => a.sensor.localeCompare(b.sensor));
         
-        // Success: Update the Persistent Cache
-        localStorage.setItem('greenhouse_last_state', JSON.stringify(cleanData));
         setData(cleanData);
-        setIsOffline(false);
+
+        if (isS3Backup) {
+          setIsOffline(true);
+        } else {
+          setIsOffline(false);
+          localStorage.setItem('greenhouse_last_state', JSON.stringify(cleanData));
+        }
       }
     } catch (error) {
       setIsOffline(true);
@@ -59,7 +70,7 @@ function App() {
         <div style={{
           ...styles.badge, 
           borderColor: isOffline ? '#fecaca' : '#e2e8f0',
-          color: '#0f172a' // Text stays black/dark for both
+          color: '#0f172a'
         }}>
           <div style={{
             ...styles.pulse, 
@@ -74,8 +85,13 @@ function App() {
 
       {isOffline && (
         <div style={styles.offlineWarning}>
-          <CloudOff size={16} />
-          <span>The cloud database is currently stopped. Displaying last synchronized state.</span>
+          <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+            <CloudOff size={18} />
+            <strong style={{fontSize: '13px'}}>Limited Mode:</strong>
+          </div>
+          <span style={{fontSize: '12px'}}>
+            Primary RDS database is stopped. SNN Diagnostics and live EventBridge polling are suspended. Displaying last known state from S3 archive.
+          </span>
         </div>
       )}
 
@@ -87,11 +103,11 @@ function App() {
             onClick={() => setSelectedSensor(item)}
             style={{ cursor: 'pointer', position: 'relative' }}
           >
-            {item.is_anomaly && (
+            {item.is_anomaly && !isOffline && (
               <div style={styles.spikeLabel}><AlertTriangle size={12} /> SNN WARNING</div>
             )}
             <div style={styles.cardHeader}>
-              <div className="icon-box-mobile" style={styles.iconBox}><SensorIcon name={item.sensor} isAnomaly={item.is_anomaly}/></div>
+              <div className="icon-box-mobile" style={styles.iconBox}><SensorIcon name={item.sensor} isAnomaly={item.is_anomaly && !isOffline}/></div>
               <span className="sensor-name-text" style={styles.sensorName}>{item.sensor.replace(/_/g, ' ')}</span>
             </div>
             <div style={styles.valueDisplay}>
@@ -167,7 +183,7 @@ const styles = {
   subtitle: { color: '#94a3b8', margin: 0, fontSize: '13px', fontWeight: '500' },
   badge: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#fff', padding: '8px 20px', borderRadius: '40px', fontSize: '11px', border: '1.5px solid', height: 'fit-content', whiteSpace: 'nowrap' },
   pulse: { width: '8px', height: '8px', borderRadius: '50%' },
-  offlineWarning: { backgroundColor: '#fee2e2', color: '#991b1b', padding: '10px 20px', borderRadius: '12px', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', border: '1px solid #fecaca', width: 'fit-content' },
+  offlineWarning: { backgroundColor: '#fee2e2', color: '#991b1b', padding: '15px 25px', borderRadius: '16px', marginBottom: '40px', display: 'flex', flexDirection: 'column', gap: '5px', border: '1.5px solid #fecaca', width: 'fit-content' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
   cardHeader: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' },
   iconBox: { backgroundColor: '#f8fafc', padding: '10px', borderRadius: '12px' },
