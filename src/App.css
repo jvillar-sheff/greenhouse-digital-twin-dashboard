@@ -5,10 +5,7 @@
   100% { transform: scale(0.95); opacity: 0.5; }
 }
 
-@keyframes spin { 
-  from { transform: rotate(0deg); } 
-  to { transform: rotate(360deg); } 
-}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 @keyframes alarm-glow {
   0% { box-shadow: 0 0 0px 0px rgba(251, 191, 36, 0); }
@@ -16,14 +13,13 @@
   100% { box-shadow: 0 0 0px 0px rgba(251, 191, 36, 0); }
 }
 
-/* --- CORE COMPONENTS --- */
+/* --- CARDS & UI --- */
 .sensor-card {
   background-color: white !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 20px !important;
   padding: 24px !important;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03) !important;
 }
 
 .sensor-card:hover {
@@ -32,88 +28,67 @@
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* --- ANOMALY STATES --- */
 .warning-card {
   border-color: #fbbf24 !important;
   background-color: #fffbeb !important;
   animation: alarm-glow 2s infinite ease-in-out !important;
 }
 
-.spike-label {
-  animation: pulse 2s infinite;
-}
-
-/* --- MODERN MODAL NAVIGATION --- */
-.modern-nav-btn {
-  transition: all 0.2s ease !important;
-}
-
+/* --- MODAL NAVIGATION --- */
 .modern-nav-btn:hover {
-  color: #64748b !important; /* Transitions from light to dark slate */
+  color: #64748b !important;
   transform: translateY(-50%) scale(1.2) !important;
 }
 
-.modern-nav-btn:active {
-  transform: translateY(-50%) scale(0.9) !important;
-}
+.animate-spin { animation: spin 1s linear infinite; }
 
-/* --- LOADER --- */
-.animate-spin { 
-  animation: spin 1s linear infinite; 
-}
-
-/* --- RESPONSIVE LOGIC (Mobile 2-Column Grid) --- */
+/* --- RESPONSIVE MOBILE LOGIC --- */
 @media (max-width: 650px) {
   .dashboard-container { 
-    padding: 20px 15px !important; 
+    padding: 25px 15px !important; 
   }
   
+  /* LEFT-ALIGN HEADER ON MOBILE */
   .header-flex { 
-    flex-direction: column; 
-    align-items: flex-start; 
-    gap: 15px; 
+    flex-direction: column !important; 
+    align-items: flex-start !important; 
+    text-align: left !important;
+    gap: 15px !important; 
   }
-  
-  /* Modern minimalist navigation is hidden on mobile to prioritize touch content */
+
+  .main-title {
+    text-align: left !important;
+    font-size: 24px !important;
+  }
+
+  /* HIDE DESKTOP-ONLY NAV ARROWS */
   .modern-nav-btn {
     display: none !important;
   }
 
-  /* FORCE 2 COLUMNS ON MOBILE */
+  /* 2-COLUMN GRID FORCE */
   .dashboard-grid {
     grid-template-columns: 1fr 1fr !important;
-    gap: 12px !important;
+    gap: 10px !important;
   }
   
-  .sensor-card { 
-    padding: 15px !important; 
-    border-radius: 15px !important; 
-  }
-  
-  .main-title { 
-    font-size: 22px !important; 
-  }
-  
-  .card-value { 
-    font-size: 24px !important; 
-  }
-  
-  .sensor-name-text { 
-    font-size: 9px !important; 
-  }
-  
-  .footer-box { 
-    display: none !important; 
-  }
+  .sensor-card { padding: 12px !important; border-radius: 12px !important; }
+  .card-value { font-size: 22px !important; }
+  .sensor-name-text { font-size: 9px !important; }
+  .footer-box { display: none !important; }
   
   .modal-content { 
     width: 95% !important; 
-    padding: 30px 15px !important; 
-    border-radius: 24px !important; 
+    padding: 30px 10px !important; 
+    border-radius: 20px !important; 
   }
 
-  /* Adjust chart padding for smaller screens */
-  .recharts-responsive-container {
-    margin-left: -10px;
+  .modal-inner-padding {
+    padding: 0 !important;
   }
+}
+
+/* Standard padding for modal content on desktop */
+.modal-inner-padding {
+  padding: 0 40px;
 }

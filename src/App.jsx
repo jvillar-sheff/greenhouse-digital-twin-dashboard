@@ -19,7 +19,7 @@ function App() {
   const [isOffline, setIsOffline] = useState(false);
   const [selectedSensor, setSelectedSensor] = useState(null);
 
-  // --- 1. MODAL NAVIGATION LOGIC ---
+  // --- 1. MODAL NAVIGATION LOGIC (Desktop Carousel) ---
   const navigateModal = useCallback((direction) => {
     if (!selectedSensor || data.length === 0) return;
     const currentIndex = data.findIndex(s => s.sensor === selectedSensor.sensor);
@@ -32,7 +32,7 @@ function App() {
     setSelectedSensor(data[nextIndex]);
   }, [selectedSensor, data]);
 
-  // Keyboard Support
+  // Keyboard Event Listeners for Arrows
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!selectedSensor) return;
@@ -44,7 +44,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedSensor, navigateModal]);
 
-  // --- 2. DATA FETCHING ---
+  // --- 2. CORE DATA FETCHING (RDS/S3 Hybrid) ---
   const fetchData = async () => {
     try {
       const response = await fetch(API_URL);
@@ -66,6 +66,7 @@ function App() {
           setIsOffline(true);
         } else {
           setIsOffline(false);
+          // High-reliability persistent cache
           localStorage.setItem('greenhouse_cache', JSON.stringify({
             data: cleanData, 
             history: json.history,
@@ -92,13 +93,14 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // --- 3. CHART HELPERS ---
+  // --- 3. CHART DATA PROCESSING ---
   const getChartData = (sensorName) => {
     if (!history || history.length === 0) return [];
     return history
       .filter(entry => {
         const val = entry.data[sensorName];
         if (val === null || val === undefined) return false;
+        // Sanitization: Filter 0 only for concentration levels (impossible zeros)
         if (sensorName === 'indoor_co2' || sensorName === 'indoor_vpd') return val !== 0;
         return true; 
       })
@@ -132,24 +134,26 @@ function App() {
   return (
     <div className="dashboard-container" style={styles.container}>
       <header className="header-flex" style={styles.header}>
-        <div>
+        <div className="title-block">
           <h1 className="main-title" style={styles.title}>Greenhouse Twin</h1>
           <p style={styles.subtitle}>SNN Cognitive Monitoring & Diagnostics</p>
         </div>
         
-        <div style={{
-          ...styles.badge, 
-          borderColor: isOffline ? '#fecaca' : '#e2e8f0',
-          color: '#0f172a'
-        }}>
+        <div className="status-badge-container">
           <div style={{
-            ...styles.pulse, 
-            backgroundColor: isOffline ? '#ef4444' : '#10b981', 
-            animation: isOffline ? 'none' : 'pulse 2s infinite'
-          }}></div>
-          <span style={{ fontWeight: '800', letterSpacing: '0.5px' }}>
-            {isOffline ? 'SYSTEM OFFLINE' : 'LIVE SYSTEM'}
-          </span>
+            ...styles.badge, 
+            borderColor: isOffline ? '#fecaca' : '#e2e8f0',
+            color: '#0f172a'
+          }}>
+            <div style={{
+              ...styles.pulse, 
+              backgroundColor: isOffline ? '#ef4444' : '#10b981', 
+              animation: isOffline ? 'none' : 'pulse 2s infinite'
+            }}></div>
+            <span style={{ fontWeight: '800', letterSpacing: '0.5px' }}>
+              {isOffline ? 'SYSTEM OFFLINE' : 'LIVE SYSTEM'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -160,7 +164,7 @@ function App() {
             <strong style={{fontSize: '13px'}}>Limited Mode:</strong>
           </div>
           <span style={{fontSize: '12px'}}>
-            Primary RDS is offline. SNN diagnostics suspended. Displaying 6-hour historical archive from S3.
+            Primary RDS is offline. Diagnostics suspended. Displaying 6-hour history from S3.
           </span>
         </div>
       )}
@@ -203,7 +207,7 @@ function App() {
         <div style={styles.modalOverlay} onClick={() => setSelectedSensor(null)}>
           <div className="modal-content" style={styles.modalContent} onClick={e => e.stopPropagation()}>
             
-            {/* MODERN IN-MODAL NAVIGATION */}
+            {/* Desktop-only Navigation Chevrons */}
             <button 
               className="modern-nav-btn"
               style={{...styles.modernNavBtn, left: '10px'}} 
@@ -222,7 +226,7 @@ function App() {
 
             <button style={styles.closeBtn} onClick={() => setSelectedSensor(null)}><X size={20} /></button>
             
-            <div style={{padding: '0 40px'}}>
+            <div className="modal-inner-padding">
                <h2 style={{textTransform: 'capitalize', fontSize: '20px', color: '#1e293b', marginBottom: '4px'}}>
                 {selectedSensor.sensor.replace(/_/g, ' ')}
               </h2>
@@ -254,7 +258,7 @@ function App() {
                     <Activity size={18} color="#92400e" />
                     <div>
                       <strong style={{ display: 'block', fontSize: '13px' }}>Diagnostic: Temporal Spike Detected</strong>
-                      <span style={{ fontSize: '12px' }}>The SNN detected a significant deviation from the rolling mean.</span>
+                      <span style={{ fontSize: '12px' }}>The SNN detected significant instability in the recent telemetry stream.</span>
                     </div>
                   </div>
                 </div>
@@ -310,23 +314,7 @@ const styles = {
   closeBtn: { position: 'absolute', top: '25px', right: '25px', border: 'none', backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   spikeLabel: { position: 'absolute', top: '20px', right: '20px', backgroundColor: '#fef3c7', color: '#d97706', padding: '5px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' },
   anomalyNote: { marginTop: '20px', backgroundColor: '#fffbeb', padding: '20px', borderRadius: '20px', border: '1px solid #fef3c7', color: '#92400e' },
-  
-  // NEW MINIMALIST NAVIGATION STYLE
-  modernNavBtn: {
-    position: 'absolute',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    backgroundColor: 'transparent',
-    color: '#cbd5e1', // Light slate grey
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s ease',
-    padding: '10px',
-    zIndex: 1002
-  }
+  modernNavBtn: { position: 'absolute', top: '50%', transform: 'translateY(-50%)', backgroundColor: 'transparent', color: '#cbd5e1', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease', padding: '10px', zIndex: 1002 }
 };
 
 export default App;
