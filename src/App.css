@@ -4,25 +4,69 @@
   100% { transform: scale(0.95); opacity: 0.5; }
 }
 
-/* THE CARD BASE */
 .sensor-card {
   background-color: white !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 24px !important;
-  padding: 28px !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+  border-radius: 20px !important;
+  padding: 24px !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03) !important;
 }
 
-/* NORMAL HOVER: Just darkens the border slightly */
+/* NO Lift-up. Just a simple border color change on hover */
 .sensor-card:hover {
   border-color: #cbd5e1 !important;
 }
 
-/* THE WARNING STATE: Faint yellow aura/glow */
+/* THE WARNING GLOW: Subtle yellow aura for SNN spikes */
 .warning-card {
   border-color: #fbbf24 !important;
   box-shadow: 0 0 15px 2px rgba(251, 191, 36, 0.2) !important;
+}
+
+/* --- RESPONSIVE LOGIC --- */
+@media (max-width: 650px) {
+  .dashboard-container {
+    padding: 25px 15px !important;
+  }
+  
+  /* STACK HEADER on mobile to prevent squishing */
+  .header-flex {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr !important; /* Force 2 columns */
+    gap: 10px !important;
+  }
+
+  .sensor-card {
+    padding: 12px !important;
+    border-radius: 12px !important;
+  }
+
+  .main-title {
+    font-size: 20px !important;
+  }
+
+  .card-value {
+    font-size: 22px !important;
+  }
+
+  .sensor-name-text {
+    font-size: 9px !important;
+  }
+
+  .footer-box {
+    display: none !important; /* Hide redundant footer on mobile to save space */
+  }
+
+  .modal-content {
+    width: 95% !important;
+    padding: 25px !important;
+  }
 }
 
 .animate-spin {
