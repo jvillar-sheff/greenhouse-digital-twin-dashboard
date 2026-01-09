@@ -8,18 +8,31 @@ const API_URL = "https://8u49qdlvy3.execute-api.us-east-1.amazonaws.com/latest";
 function App() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
   const [selectedSensor, setSelectedSensor] = useState(null);
 
   const fetchData = async () => {
     try {
       const response = await fetch(API_URL);
-      if (!response.ok) throw new Error('DB Offline');
+      if (!response.ok) throw new Error('Unreachable');
       const json = await response.json();
-      const cleanData = json.filter(item => isNaN(item.sensor) && !['matlab_datenum', 'unix_time', 'timestamp'].includes(item.sensor.toLowerCase()));
-      cleanData.sort((a, b) => a.sensor.localeCompare(b.sensor));
-      setData(cleanData);
+
+      if (Array.isArray(json) && json.length > 0) {
+        const cleanData = json.filter(item => isNaN(item.sensor) && !['matlab_datenum', 'unix_time', 'timestamp'].includes(item.sensor.toLowerCase()));
+        cleanData.sort((a, b) => a.sensor.localeCompare(b.sensor));
+        
+        // Success: Update the Persistent Cache
+        localStorage.setItem('greenhouse_last_state', JSON.stringify(cleanData));
+        setData(cleanData);
+        setIsOffline(false);
+      }
+    } catch (error) {
+      setIsOffline(true);
+      const cached = localStorage.getItem('greenhouse_last_state');
+      if (cached) setData(JSON.parse(cached));
+    } finally {
       setLoading(false);
-    } catch (error) { console.error(error); setLoading(false); }
+    }
   };
 
   useEffect(() => {
@@ -31,7 +44,7 @@ function App() {
   if (loading) return (
     <div style={styles.loaderContainer}>
       <Loader2 className="animate-spin" size={32} color="#10b981" />
-      <p style={{fontSize: '14px', marginTop: '10px', color: '#64748b'}}>Establishing Cloud Link...</p>
+      <p style={{fontSize: '14px', marginTop: '10px', color: '#64748b'}}>Synchronizing Twin...</p>
     </div>
   );
 
@@ -40,13 +53,31 @@ function App() {
       <header className="header-flex" style={styles.header}>
         <div>
           <h1 className="main-title" style={styles.title}>Greenhouse Twin</h1>
-          <p style={styles.subtitle}>Real-time Cognitive Monitoring & SNN Diagnostics</p>
+          <p style={styles.subtitle}>SNN Cognitive Monitoring & Diagnostics</p>
         </div>
-        <div style={styles.badge}>
-          <div style={{...styles.pulse, backgroundColor: '#10b981', animation: 'pulse 2s infinite'}}></div>
-          LIVE SYSTEM
+        
+        <div style={{
+          ...styles.badge, 
+          borderColor: isOffline ? '#fecaca' : '#e2e8f0',
+          color: '#0f172a' // Text stays black/dark for both
+        }}>
+          <div style={{
+            ...styles.pulse, 
+            backgroundColor: isOffline ? '#ef4444' : '#10b981', 
+            animation: isOffline ? 'none' : 'pulse 2s infinite'
+          }}></div>
+          <span style={{ fontWeight: '800', letterSpacing: '0.5px' }}>
+            {isOffline ? 'SYSTEM OFFLINE' : 'LIVE SYSTEM'}
+          </span>
         </div>
       </header>
+
+      {isOffline && (
+        <div style={styles.offlineWarning}>
+          <CloudOff size={16} />
+          <span>The cloud database is currently stopped. Displaying last synchronized state.</span>
+        </div>
+      )}
 
       <div className="dashboard-grid" style={styles.grid}>
         {data.map((item) => (
@@ -56,8 +87,11 @@ function App() {
             onClick={() => setSelectedSensor(item)}
             style={{ cursor: 'pointer', position: 'relative' }}
           >
+            {item.is_anomaly && (
+              <div style={styles.spikeLabel}><AlertTriangle size={12} /> SNN WARNING</div>
+            )}
             <div style={styles.cardHeader}>
-              <div style={styles.iconBox}><SensorIcon name={item.sensor} isAnomaly={item.is_anomaly}/></div>
+              <div className="icon-box-mobile" style={styles.iconBox}><SensorIcon name={item.sensor} isAnomaly={item.is_anomaly}/></div>
               <span className="sensor-name-text" style={styles.sensorName}>{item.sensor.replace(/_/g, ' ')}</span>
             </div>
             <div style={styles.valueDisplay}>
@@ -76,34 +110,16 @@ function App() {
           <div className="modal-content" style={styles.modalContent} onClick={e => e.stopPropagation()}>
             <button style={styles.closeBtn} onClick={() => setSelectedSensor(null)}><X size={20} /></button>
             <h2 style={{textTransform: 'capitalize', fontSize: '20px', color: '#1e293b', marginBottom: '4px'}}>{selectedSensor.sensor.replace(/_/g, ' ')}</h2>
-            <p style={{fontSize: '12px', color: '#94a3b8', marginBottom: '20px'}}>4-Hour History (15m intervals)</p>
-            
+            <p style={{fontSize: '12px', color: '#94a3b8', marginBottom: '20px'}}>4-Hour Window (15m Intervals)</p>
             <div style={styles.chartContainer}>
               <ResponsiveContainer width="100%" height={280}>
-                <AreaChart 
-                  data={generate15MinHistory(selectedSensor.value)}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="color" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+                <AreaChart data={generate15MinHistory(selectedSensor.value)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs><linearGradient id="color" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient></defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  
-                  {/* AXIS: Tick only on :00 and :30 marks */}
-                  <XAxis 
-                    dataKey="time" 
-                    stroke="#94a3b8" 
-                    fontSize={10} 
-                    tickMargin={12} 
-                    tickFormatter={(str) => (str.endsWith(':00') || str.endsWith(':30') ? str : '')} 
-                  />
-                  
+                  <XAxis dataKey="time" stroke="#94a3b8" fontSize={10} tickMargin={12} tickFormatter={(str) => (str.endsWith(':00') || str.endsWith(':30') ? str : '')} />
                   <YAxis domain={['auto', 'auto']} stroke="#94a3b8" fontSize={10} />
-                  <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px rgba(0,0,0,0.1)'}} />
-                  <Area type="monotone" dataKey="value" stroke="#10b981" fill="url(#color)" strokeWidth={3} dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }} />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="value" stroke="#10b981" fill="url(#color)" strokeWidth={3} dot={{ r: 3, fill: '#10b981' }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -120,10 +136,7 @@ const generate15MinHistory = (val) => {
   now.setMinutes(Math.floor(now.getMinutes() / 15) * 15, 0, 0);
   for (let i = 16; i >= 0; i--) {
     const t = new Date(now.getTime() - i * 15 * 60 * 1000);
-    points.push({ 
-      time: `${t.getHours().toString().padStart(2, '0')}:${t.getMinutes().toString().padStart(2, '0')}`, 
-      value: val + (Math.random() - 0.5) * (val * 0.05) 
-    });
+    points.push({ time: `${t.getHours().toString().padStart(2, '0')}:${t.getMinutes().toString().padStart(2, '0')}`, value: val + (Math.random() - 0.5) * (val * 0.05) });
   }
   return points;
 };
@@ -152,11 +165,12 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' },
   title: { color: '#0f172a', margin: 0, fontSize: '32px', fontWeight: '800', letterSpacing: '-1px' },
   subtitle: { color: '#94a3b8', margin: 0, fontSize: '13px', fontWeight: '500' },
-  badge: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#fff', padding: '8px 16px', borderRadius: '30px', fontSize: '11px', fontWeight: '800', border: '1px solid #e2e8f0', height: 'fit-content' },
+  badge: { display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#fff', padding: '8px 20px', borderRadius: '40px', fontSize: '11px', border: '1.5px solid', height: 'fit-content', whiteSpace: 'nowrap' },
   pulse: { width: '8px', height: '8px', borderRadius: '50%' },
+  offlineWarning: { backgroundColor: '#fee2e2', color: '#991b1b', padding: '10px 20px', borderRadius: '12px', marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', border: '1px solid #fecaca', width: 'fit-content' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' },
   cardHeader: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' },
-  iconBox: { backgroundColor: '#f8fafc', padding: '8px', borderRadius: '10px' },
+  iconBox: { backgroundColor: '#f8fafc', padding: '10px', borderRadius: '12px' },
   sensorName: { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.5px' },
   valueDisplay: { display: 'flex', alignItems: 'baseline', gap: '5px' },
   value: { fontSize: '36px', fontWeight: '900', color: '#1e293b' },
@@ -165,7 +179,8 @@ const styles = {
   modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modalContent: { position: 'relative', backgroundColor: 'white', width: '80%', maxWidth: '750px', padding: '40px', borderRadius: '28px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.1)' },
   chartContainer: { marginTop: '10px', backgroundColor: '#ffffff', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9' },
-  closeBtn: { position: 'absolute', top: '25px', right: '25px', border: 'none', backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  closeBtn: { position: 'absolute', top: '25px', right: '25px', border: 'none', backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  spikeLabel: { position: 'absolute', top: '20px', right: '20px', backgroundColor: '#fef3c7', color: '#d97706', padding: '5px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }
 };
 
 export default App;
